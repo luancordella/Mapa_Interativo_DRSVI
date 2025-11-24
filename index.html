@@ -1,301 +1,310 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <title>Mapa SUS - DRS VI (Completo)</title>
+    <title>Mapa Inteligente SUS - DRS VI</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Bibliotecas Externas -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        /* Estilos Gerais */
-        html, body { height: 100%; margin: 0; font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; }
-        #map { width: 100%; height: 100vh; z-index: 1; }
-
-        /* Menu de Seleção de Modo */
-        #mode-menu {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            display: flex;
-            gap: 15px;
-            align-items: center;
+        /* --- ESTILOS MODERNOS (UI/UX) --- */
+        :root {
+            --primary: #0056b3;
+            --secondary: #00a8cc;
+            --accent: #ff4757;
+            --dark: #2f3542;
+            --light: #f1f2f6;
+            --glass: rgba(255, 255, 255, 0.92);
+            --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
         }
-        #mode-menu label {
-            font-weight: 600;
-            font-size: 14px;
-            color: #333;
+
+        body { 
+            margin: 0; 
+            font-family: 'Roboto', sans-serif; 
+            background-color: var(--light); 
+            overflow: hidden;
+        }
+
+        #map { 
+            width: 100%; 
+            height: 100vh; 
+            z-index: 1; 
+        }
+
+        /* --- PAINÉIS FLUTUANTES (Glassmorphism) --- */
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: var(--shadow);
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        /* Menu de Controle */
+        #control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0 0 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Input de Busca */
+        .search-box {
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 35px 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+
+        /* Botões de Modo (Radio Personalizado) */
+        .mode-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         .mode-option {
             display: flex;
-            gap: 5px;
             align-items: center;
-        }
-        .mode-option input[type="radio"] {
             cursor: pointer;
-        }
-        .mode-option label {
-            cursor: pointer;
-            font-weight: normal;
-            font-size: 13px;
-        }
-
-        /* Estilos do Popup/Relatório */
-        .info-popup {
-            min-width: 260px;
-            max-height: 350px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
-        .municipio-titulo {
-            font-size: 1.4em;
-            color: #0056b3;
-            border-bottom: 2px solid #0056b3;
-            margin-bottom: 10px;
-            display: block;
-            font-weight: bold;
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 1px dotted #ccc;
-            padding: 3px 0;
-        }
-        .info-label { font-weight: 600; color: #555; margin-right: 10px; }
-        .info-value { font-weight: bold; color: #333; text-align: right; }
-        .total-row {
-            background-color: #e9ecef;
-            margin-top: 8px;
-            padding: 8px 5px;
-            border-radius: 4px;
-            font-size: 1.1em;
-            color: #dc3545;
-        }
-
-        /* Box de Info da Região (COMPACTO) */
-        .region-info {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.25);
-            font-size: 12px;
-            width: 320px;
-            max-height: 85vh;
-            overflow-y: auto;
-            pointer-events: auto;
-        }
-        .region-info:hover {
-            overflow-y: auto;
-        }
-        .region-info h4 {
-            margin: 0 0 8px;
-            color: #0056b3;
-            font-size: 15px;
-            border-bottom: 2px solid #0056b3;
-            padding-bottom: 5px;
-            font-weight: bold;
-        }
-        .region-info p { margin: 5px 0; font-weight: bold; font-size: 12px; }
-        .region-info .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            border-bottom: 1px dotted #ddd;
-            line-height: 1.4;
-        }
-        .region-info .detail-label {
-            font-size: 11px;
-            color: #555;
-            flex: 1;
-            padding-right: 10px;
-        }
-        .region-info .detail-value {
-            font-weight: bold;
-            color: #333;
-            text-align: right;
-            font-size: 12px;
-            min-width: 40px;
-        }
-        .region-info .total-highlight {
-            background-color: #e3f2fd;
-            margin-top: 8px;
             padding: 8px;
-            border-radius: 5px;
-            font-size: 13px;
-            color: #1976d2;
-            font-weight: bold;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .mode-option:hover {
+            background: rgba(0, 86, 179, 0.1);
+        }
+        .mode-option input {
+            margin-right: 10px;
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+        }
+        .mode-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--dark);
         }
 
-        /* Box de Info do Município (COMPACTO) */
-        .municipio-info {
+        /* --- INFO BOX LATERAL --- */
+        #info-sidebar {
             position: absolute;
-            top: 10px;
-            right: 350px;
+            top: 20px;
+            right: 20px;
             z-index: 1000;
-            background: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.25);
-            font-size: 12px;
-            width: 280px;
-            max-height: 85vh;
+            width: 340px;
+            max-height: calc(100vh - 40px);
             overflow-y: auto;
-            pointer-events: auto;
+            transform: translateX(120%); /* Escondido por padrão */
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .municipio-info h4 {
-            margin: 0 0 8px;
-            color: #d32f2f;
-            font-size: 14px;
-            border-bottom: 2px solid #d32f2f;
-            padding-bottom: 5px;
-            font-weight: bold;
-        }
-        .municipio-info .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            border-bottom: 1px dotted #ddd;
-            line-height: 1.4;
-        }
-        .municipio-info .detail-label {
-            font-size: 11px;
-            color: #555;
-            flex: 1;
-            padding-right: 8px;
-        }
-        .municipio-info .detail-value {
-            font-weight: bold;
-            color: #333;
-            text-align: right;
-            font-size: 12px;
-            min-width: 35px;
-        }
-        .municipio-info .total-highlight {
-            background-color: #ffebee;
-            margin-top: 8px;
-            padding: 8px;
-            border-radius: 5px;
-            font-size: 13px;
-            color: #c62828;
-            font-weight: bold;
+        #info-sidebar.active {
+            transform: translateX(0);
         }
 
-        /* Aviso de carregamento */
-        #loading {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255,255,255,0.9); padding: 20px; border-radius: 10px;
-            z-index: 9999; font-weight: bold; box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        .info-header {
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
-
-        /* Efeito de transição suave para polígonos do mapa */
-        .leaflet-interactive {
-            transition: all 0.3s ease-in-out;
-            cursor: pointer;
+        .info-header h2 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 22px;
         }
-
-        /* Estilos para a Página de Impressão */
-        @media print {
-            body { -webkit-print-color-adjust: exact; }
-            h1, h2 { page-break-after: avoid; }
-            .container { page-break-inside: avoid; }
-            #data-print { margin-top: 20px; }
-            button { display: none; }
-        }
-        .print-body { padding: 20px; }
-        .print-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            align-items: flex-start;
-        }
-        #map-print {
-            width: 400px;
-            height: 400px;
-            border: 1px solid #ccc;
-        }
-        #data-print {
-            flex: 1;
-            min-width: 300px;
-        }
-        .print-body h1 { color: #0056b3; }
-        .print-body h2 { border-bottom: 2px solid #eee; padding-bottom: 5px; color: #333; }
-        .print-button {
-            padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white;
-            border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px;
-        }
-
-        /* Estilo para municípios da região no relatório */
-        .municipio-item {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 4px;
-            border-left: 4px solid #0056b3;
-        }
-        .municipio-item-nome {
-            font-weight: bold;
-            color: #333;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-        .municipio-item-stats {
+        .info-header span {
             font-size: 12px;
             color: #666;
-            display: flex;
-            gap: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        /* Estilo para seção de regiões no relatório DRS VI */
-        .regiao-section {
-            margin: 20px 0;
-            padding: 15px;
-            background: #f8f9fa;
+        /* Cards de Dados */
+        .data-card {
+            background: white;
             border-radius: 8px;
-            border-left: 5px solid #0056b3;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        .regiao-section h3 {
-            margin: 0 0 10px 0;
-            color: #0056b3;
-            font-size: 16px;
+        .data-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #777;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
         }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px dotted #eee;
+        }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { font-size: 13px; color: var(--dark); }
+        .stat-value { font-weight: 700; color: var(--primary); }
+        
+        .big-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+            text-align: center;
+            display: block;
+            margin: 5px 0;
+        }
+
+        /* --- TOOLTIPS INTELIGENTES --- */
+        .smart-tooltip {
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 5px 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .leaflet-tooltip-left:before, .leaflet-tooltip-right:before {
+            border-left-color: rgba(0,0,0,0.8);
+            border-right-color: rgba(0,0,0,0.8);
+        }
+
+        /* Loading */
+        #loading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 15px;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Botão Ação */
+        .btn-action {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .btn-action:hover { background: #004494; }
+
     </style>
 </head>
 <body>
 
-    <div id="loading">Carregando dados e mapa dos municípios...</div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Carregando inteligência de dados...</div>
+    </div>
+
     <div id="map"></div>
 
-    <!-- Menu de Seleção de Modo -->
-    <div id="mode-menu">
-        <label>Modo de Selecao:</label>
-        <div class="mode-option">
-            <input type="radio" id="modo-municipio" name="modo" value="municipio" checked>
-            <label for="modo-municipio">Municipio</label>
+    <!-- Painel de Controle Esquerdo -->
+    <div id="control-panel" class="glass-panel">
+        <div class="panel-title"><i class="fas fa-map-marked-alt"></i> Controle DRS VI</div>
+        
+        <!-- Busca Inteligente -->
+        <div class="search-box">
+            <input type="text" id="city-search" class="search-input" placeholder="Buscar município..." list="city-list">
+            <i class="fas fa-search search-icon"></i>
+            <datalist id="city-list"></datalist>
         </div>
-        <div class="mode-option">
-            <input type="radio" id="modo-regiao" name="modo" value="regiao">
-            <label for="modo-regiao">Regiao</label>
+
+        <div style="border-top: 1px solid rgba(0,0,0,0.1); margin: 5px 0;"></div>
+
+        <div class="mode-selector">
+            <div class="panel-title" style="font-size: 13px; color: #666;">MODO DE VISUALIZAÇÃO</div>
+            <label class="mode-option">
+                <input type="radio" name="modo" value="municipio" checked>
+                <span class="mode-label">Por Município (Detalhado)</span>
+            </label>
+            <label class="mode-option">
+                <input type="radio" name="modo" value="regiao">
+                <span class="mode-label">Por Região de Saúde</span>
+            </label>
+            <label class="mode-option">
+                <input type="radio" name="modo" value="drsvi">
+                <span class="mode-label">Visão Geral DRS VI</span>
+            </label>
         </div>
-        <div class="mode-option">
-            <input type="radio" id="modo-drsvi" name="modo" value="drsvi">
-            <label for="modo-drsvi">Toda DRS VI</label>
+    </div>
+
+    <!-- Painel Lateral de Informações (Slide-in) -->
+    <div id="info-sidebar" class="glass-panel">
+        <div id="info-content">
+            <div style="text-align: center; color: #999; margin-top: 20px;">
+                <i class="fas fa-mouse-pointer" style="font-size: 30px; margin-bottom: 10px;"></i><br>
+                Passe o mouse sobre o mapa<br>para ver detalhes
+            </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // ==================================================================
-        // 0. DADOS EMBUTIDOS - DADOS COMPLETOS ATUALIZADOS
+        // 0. DADOS RAW COMPLETOS
         // ==================================================================
-
-        // 0.1 DADOS DE UNIDADES
         const csvDataRaw = `Cod municipio,Municipio,POSTO DE SAUDE,CENTRO DE SAUDE/UNIDADE BASICA,POLICLINICA,HOSPITAL GERAL,UNIDADE MISTA,PRONTO SOCORRO ESPECIALIZADO,CONSULTORIO ISOLADO,CLINICA/CENTRO DE ESPECIALIDADE,UNIDADE DE APOIO DIAGNOSE E TERAPIA (SADT ISOLADO),UNIDADE MOVEL DE NIVEL PRE-HOSPITALAR NA AREA DE URGENCIA,CENTRO DE ATENCAO PSICOSSOCIAL,PRONTO ATENDIMENTO,Total
 350055,AGUAS DE SANTA BARBARA,0,3,0,0,0,0,0,0,1,0,0,1,6
 350070,AGUDOS,0,8,1,1,0,0,0,1,1,0,1,2,16
@@ -366,7 +375,6 @@
 355470,TORRINHA,0,2,0,1,0,0,1,0,1,0,0,0,8
 355590,URU,0,1,0,0,0,0,0,0,0,0,0,0,3`;
 
-        // 0.2 DADOS DAS MICRORREGIÕES
         const csvRegionsRaw = `Departamento Regional de Saúde - DRS 6,,,,
 ,,,,
 DRS 6,,,,
@@ -391,7 +399,6 @@ Torre de Pedra*,Piraju,Paulistânia,,
 ,,Reginópolis,,
 * Municípios com porta aberta no PSA,,,,`;
 
-        // 0.3 DADOS DE PRÉ-NATAL DIABETES - DADOS COMPLETOS ATUALIZADOS DO CSV
         const csvPrenatalRaw = `TOTAL,MUNICIPIO,ITEM,TIPO,ANO
 294,BOTUCATU,PRE NATAL DIABETES,RETORNO,2024
 254,BOTUCATU,PRE NATAL DIABETES,RETORNO,2025
@@ -480,7 +487,6 @@ Torre de Pedra*,Piraju,Paulistânia,,
 1,BARAO DE ANTONINA,PRE NATAL DIABETES,CASO NOVO,2024
 1,PARDINHO,PRE NATAL DIABETES,CASO NOVO,2025`;
 
-        // 0.4 DADOS DE PARTOS - DADOS COMPLETOS ATUALIZADOS DO CSV
         const csvPartosRaw = `TOTAL,NM_CIDADE,DS_CIRURGIA,ANO
 363,BOTUCATU,PARTO CESARIANO EM GESTACAO DE ALTO RISCO,2024
 327,BOTUCATU,PARTO CESARIANO EM GESTACAO DE ALTO RISCO,2025
@@ -798,97 +804,25 @@ Torre de Pedra*,Piraju,Paulistânia,,
 1,BOFETE,PARTO NORMAL COM EPISIOTOMIA,2024
 1,PIRATININGA,PARTO NORMAL EM GESTACAO DE ALTO RISCO,2025`;
 
-        // 0.4 DADOS DE EQUIPAMENTOS
-        const csvEquipamentosRaw = `Município,Gama Câmara,Mamógrafo com Comando Simples,Mamógrafo com Estereotaxia,Raio X até 100 mA,Raio X de 100 a 500 mA,Raio X mais de 500mA,Raio X Dentário,Raio X com Fluoroscopia,Raio X para Densitometria Óssea,Raio X para Hemodinâmica,Tomógrafo Computadorizado,Ressonância Magnética,Ultrassom Doppler Colorido,Ultrassom Ecógrafo,Ultrassom Convencional,Mamografo computadorizado,PET/CT,Grupo Gerador,Usina de Oxigênio,Endoscópio das Vias Respiratórias,Endoscópio das Vias Urinárias,Endoscópio Digestivo,Equipamentos para Optometria,Laparoscópio/Vídeo,Microcópio Cirúrgico,Cadeira Oftalmológica,Coluna Otalmológica,Refrator,Lensomêtro,Projetor ou Tabela de Optotipos,Retinoscópio,Oftalmoscópio,Ceratômetro,Tonômetro de Aplanação,Biomicroscópio (Lâmpada de Fenda),Campímetro,Eletrocardiógrafo,Eletroencefalógrafo,Bomba/Balão Intra-Aórtico,Bomba de Infusão,Berço Aquecido,Bilirrubinômetro,Debitômetro,Desfibrilador,Equipamento de Fototerapia,Incubadora,Marcapasso Temporário,Monitor de ECG,Monitor de Pressão Invasivo,Monitor de Pressão Não-Invasivo,Reanimador Pulmonar/AMBU,Respirador/Ventilador,Aparelho de Diatermia por Ultrassom/Ondas Curtas,Aparelho de Eletroestimulação,Bomba de Infusão de Hemoderivados,Equipamentos de Aférese,Equipamento de Circulação Extracorpórea,Equipamento para Hemodiálise,Forno de Bier,Equipo Odontológico Completo,Compressor Odontológico,Fotopolimerizador,Caneta de Alta Rotação,Caneta de Baixa Rotação,Amalgamador,Aparelho de Profilaxia c/Jato de Bicarbonato,Emissões Otoacusticas Evocadas Transientes,Emissões Otoacusticas Evocadas por Prod. de Dist,Potencial Evocado Auditivo de Tronco Encef Autom,Pot Evocado Aud Tronco Encef. Curta Media e Long,Audiometro de um Canal,Audiometro de dois Canal,Imitanciometro,Imitanciometro Multifrequencial,Cabine  Acustica,Sistema DE Campo Livre,Sistema Completo de reforço Visual (VRA),Ganho de Inserção,Detector Fetal Portatil,Ultrassom Portatil,Aparelho de Hemodialise - Ambulatorial,Aparelho de Hemodialise - Hospitalar,Aparelho de Hemodialise Reserva,Aparelho para Dialise Peritonial,Total
-AGUAS DE SANTA BARBARA,0,0,0,0,0,0,6,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,4,0,1,0,0,0,0,0,2,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24
-AGUDOS,0,0,0,3,2,0,8,0,0,0,1,0,1,1,2,0,0,2,0,0,0,1,2,1,2,4,4,4,4,4,4,4,3,4,3,2,14,1,0,8,4,0,0,4,1,3,0,8,2,20,7,4,1,1,0,3,0,0,2,35,10,15,14,14,6,13,0,0,0,0,2,0,0,0,1,0,0,0,0,0,0,0,0,0,265
-ANHEMBI,0,0,0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,2,0,0,0,2,0,0,6,0,0,0,0,0,0,0,0,4,1,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26
-ARANDU,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1,0,0,2,0,1,0,2,0,1,4,2,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,21
-AREALVA,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,6,1,0,0,3,1,1,0,6,0,6,9,3,0,0,0,0,0,0,0,4,1,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49
-AREIOPOLIS,0,0,0,0,0,0,4,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1,1,1,1,1,1,1,1,1,1,0,4,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,2,0,0,1,0,0,11,2,2,4,3,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52
-AVAI,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,22
-AVARE,0,4,0,4,6,1,43,2,2,0,4,3,14,6,15,0,0,6,2,2,2,9,1,0,5,5,3,4,3,2,4,3,3,1,3,1,51,10,0,90,11,1,0,24,4,15,2,13,2,39,91,49,24,35,0,0,0,0,5,74,54,51,66,54,45,41,5,2,1,1,1,4,3,1,3,0,0,0,0,0,34,3,5,0,1222
-BALBINOS,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1,0,0,0,0,1,4,2,1,2,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23
-BARAO DE ANTONINA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,1,0,1,0,1,0,10,2,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23
-BARIRI,0,1,0,2,2,0,3,0,0,0,0,0,2,3,6,0,0,1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,9,2,0,6,6,0,0,3,2,1,0,15,0,6,6,11,3,3,0,0,0,0,1,18,1,1,1,1,1,0,1,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,123
-BARRA BONITA,0,1,0,4,2,2,16,1,0,0,2,0,2,2,2,0,0,2,0,0,0,2,8,1,1,2,2,1,2,2,2,2,1,2,1,2,23,3,6,5,2,0,0,14,2,6,0,13,2,14,17,10,25,31,8,3,0,0,4,33,22,29,47,32,20,21,1,0,0,0,2,2,0,0,3,0,0,0,0,0,0,0,0,0,481
-BAURU,6,11,2,30,33,17,185,9,7,7,23,10,74,20,48,2,0,39,9,34,40,55,52,27,54,32,30,30,16,28,26,67,16,28,33,7,183,24,7,679,46,2,0,168,54,72,26,517,140,543,520,300,64,101,0,18,6,28,7,675,181,269,408,338,127,176,16,14,9,20,48,31,51,26,64,15,9,27,0,0,62,13,11,54,7479
-BOCAINA,0,0,0,0,1,0,4,0,0,0,0,0,3,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,1,1,2,0,2,0,0,5,2,3,2,0,0,0,0,1,8,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49
-BOFETE,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,9,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,2,4,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28
-BORACEIA,0,0,0,0,0,0,1,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,1,0,1,1,1,0,0,0,0,0,0,1,3,1,0,0,0,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,17
-BOREBI,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5
-BOTUCATU,2,2,5,11,11,9,77,11,1,2,7,4,23,9,47,1,1,26,6,5,11,40,28,15,19,15,8,11,7,10,7,46,6,14,17,4,107,11,3,870,39,1,0,112,43,37,11,287,38,66,141,165,56,73,0,6,2,1,5,153,105,74,139,90,59,48,4,2,4,0,2,8,7,1,6,3,0,0,0,0,36,12,14,99,3511
-BROTAS,0,0,0,1,1,0,20,1,0,0,1,0,0,1,2,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,0,1,0,0,0,0,8,0,0,11,2,0,0,4,1,2,0,3,0,3,6,1,11,11,0,0,0,0,2,29,6,7,6,6,4,4,0,0,0,0,1,2,0,0,2,0,0,0,0,0,0,0,0,0,163
-CABRALIA PAULISTA,0,0,0,0,0,0,2,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,3,2,3,3,4,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,25
-CAFELANDIA,0,0,0,0,2,0,9,0,0,0,0,0,2,1,2,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,6,4,0,0,4,2,3,0,4,0,12,10,3,9,6,0,0,0,0,2,18,15,19,27,20,12,16,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,219
-CERQUEIRA CESAR,0,1,0,1,3,0,3,0,0,0,0,0,0,2,3,0,0,2,0,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,6,0,0,5,2,0,0,6,2,2,0,5,0,4,7,6,6,8,0,0,0,0,2,20,12,10,14,12,10,7,0,0,0,0,1,1,0,0,1,0,0,0,0,0,0,0,0,0,184
-CONCHAS,0,1,0,3,1,0,10,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,9,1,0,4,1,0,0,3,3,2,1,5,0,10,5,2,4,5,0,0,0,0,2,17,7,7,9,8,6,2,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,140
-CORONEL MACEDO,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,6,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24
-DOIS CORREGOS,0,1,0,1,0,2,7,0,0,0,0,0,0,1,2,0,0,1,0,0,0,0,2,1,2,4,3,2,3,4,2,3,1,3,3,2,11,1,0,0,2,0,0,2,3,3,0,4,2,2,9,2,7,4,0,0,0,0,4,10,8,11,15,13,4,10,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,192
-DUARTINA,1,0,0,1,3,0,7,0,0,0,0,0,1,3,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,1,2,0,0,4,2,2,0,3,0,5,3,3,4,2,0,3,0,0,2,15,9,12,18,13,7,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,146
-FARTURA,0,1,0,1,1,0,7,0,0,0,0,0,0,1,1,0,0,1,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,2,1,0,0,2,1,2,0,1,0,6,9,3,2,3,0,0,0,0,1,15,4,3,5,3,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,96
-GETULINA,0,0,0,1,1,0,5,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,1,1,0,0,1,1,2,0,2,0,6,5,2,3,4,0,0,0,0,4,14,6,7,18,11,13,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,115
-GUAICARA,0,0,0,0,0,0,3,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,6,10,0,0,0,0,3,17,9,12,21,13,5,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,113
-IACANGA,0,0,0,0,1,1,6,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,2,1,2,0,0,0,2,8,0,4,7,0,0,0,0,1,10,4,4,10,7,4,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,80
-IARAS,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,4,0,0,0,4,0,1,4,2,1,1,0,0,0,0,0,6,2,1,1,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,45
-IGARACU DO TIETE,0,0,0,1,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,4,1,0,1,0,0,0,1,0,0,0,0,0,3,0,0,2,3,0,1,0,0,1,10,5,5,6,7,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,63
-ITAI,1,1,0,0,1,0,1,0,0,1,2,0,2,0,3,0,0,1,2,0,0,0,0,0,0,1,1,1,0,0,0,1,0,1,1,0,9,0,0,12,3,0,0,6,1,2,0,5,0,5,12,5,2,3,0,0,0,0,5,7,5,5,9,6,7,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,140
-ITAJU,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,1,1,1,2,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,12
-ITAPORANGA,0,0,0,1,1,0,0,0,0,0,1,0,2,0,2,0,0,2,1,0,0,1,0,1,0,0,0,0,0,0,0,3,0,0,0,0,7,0,0,0,3,0,0,6,2,3,0,9,0,12,12,6,1,2,7,0,0,0,1,4,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,91
-ITAPUI,0,0,0,0,2,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,1,0,0,0,4,0,0,0,2,0,8,6,2,0,4,0,0,0,0,0,4,4,4,7,4,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,61
-ITATINGA,0,0,0,0,1,0,7,0,0,0,0,0,0,0,2,0,0,1,1,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,7,1,0,4,1,0,0,4,0,2,0,4,0,2,6,3,8,10,0,0,0,0,2,20,18,18,23,17,16,7,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,194
-JAU,4,5,4,4,13,8,34,9,4,1,8,4,22,9,19,1,1,13,12,11,49,38,34,13,20,25,20,23,22,21,18,25,17,19,18,7,84,8,0,480,22,0,0,99,27,23,10,111,161,204,336,130,62,75,0,4,1,2,2,78,44,44,77,53,21,34,6,2,2,2,6,6,5,4,10,2,2,1,0,0,38,10,5,0,2892
-LARANJAL PAULISTA,0,1,0,0,1,1,11,0,0,0,1,0,4,2,6,1,0,1,2,2,0,6,2,3,0,0,0,0,0,0,0,0,0,0,0,0,7,2,0,10,4,1,0,5,4,2,0,2,17,7,13,15,11,11,0,0,0,0,6,15,4,2,13,7,0,3,0,0,0,0,1,0,1,0,2,0,0,0,0,0,0,0,0,0,212
-LENCOIS PAULISTA,0,3,0,3,6,3,30,0,3,0,1,4,8,5,7,0,0,2,0,3,2,3,5,3,3,1,0,1,1,1,0,1,0,0,1,1,29,4,0,61,6,0,6,17,5,4,2,29,19,111,47,24,46,52,0,0,0,0,8,39,19,20,28,23,14,13,1,0,0,0,1,3,0,0,1,0,0,0,0,0,0,0,0,0,746
-LINS,1,3,0,20,6,3,173,1,3,0,7,3,15,8,9,0,0,5,1,10,4,4,10,6,5,9,6,6,7,7,6,10,6,7,8,2,39,4,0,59,5,0,0,28,9,22,7,64,11,41,126,59,49,128,0,2,0,21,7,297,205,241,362,268,105,180,1,0,0,0,3,5,2,1,10,0,0,0,0,0,0,0,0,0,2824
-LUCIANOPOLIS,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1,3,0,0,0,0,0,3,3,3,5,5,5,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,37
-MACATUBA,0,0,0,1,3,0,5,0,0,0,0,0,0,0,1,0,0,1,1,0,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,6,0,0,6,2,0,0,1,2,5,0,7,7,14,9,7,4,8,0,0,0,0,3,19,20,12,21,17,12,10,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,225
-MANDURI,0,0,0,0,0,1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,7,0,0,2,0,0,4,6,0,0,0,2,1,1,6,2,0,0,0,0,0,0,0,6,5,5,4,3,4,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,68
-MINEIROS DO TIETE,0,0,0,0,1,1,1,0,0,0,0,0,1,0,2,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,1,0,1,0,0,0,0,0,0,0,2,0,0,2,1,2,2,0,3,1,0,1,4,4,4,7,4,4,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,60
-PARANAPANEMA,0,0,0,7,0,1,8,0,0,0,0,0,0,0,2,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,1,1,0,0,2,1,2,0,1,1,2,11,2,2,4,0,0,0,0,1,18,19,23,27,18,17,16,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,191
-PARDINHO,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,1,0,4,9,0,2,1,0,0,0,0,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,35
-PAULISTANIA,0,0,0,0,0,0,2,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23
-PEDERNEIRAS,0,2,0,3,2,0,11,0,0,0,1,0,3,0,2,0,0,2,0,1,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,11,2,0,25,3,0,0,3,1,1,0,6,1,27,1,13,6,6,0,0,1,0,2,47,25,28,54,51,13,20,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,385
-PEREIRAS,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,0,0,0,0,6,1,1,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24
-PIRAJU,0,0,0,1,3,0,19,0,1,0,2,0,1,2,8,3,0,1,1,4,1,0,3,2,0,0,0,0,0,0,0,0,0,0,0,0,18,1,0,8,3,0,0,7,4,4,1,14,5,60,35,8,13,11,0,0,1,0,5,47,27,35,56,46,23,22,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,519
-PIRAJUI,0,0,0,3,3,0,7,1,0,0,1,0,3,3,2,0,0,2,1,0,0,1,1,0,0,0,0,0,0,0,0,3,0,0,0,0,13,0,0,6,3,1,0,4,1,3,1,14,0,7,11,4,4,2,0,0,0,0,4,22,9,13,29,16,9,9,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,222
-PIRATININGA,0,0,0,0,1,1,1,0,0,0,0,0,1,2,1,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,2,0,0,3,0,0,0,3,0,0,0,4,0,1,5,4,0,0,0,0,0,0,0,4,4,2,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,47
-PONGAI,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11
-PORANGABA,0,0,0,0,1,0,2,0,0,0,0,0,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,2,0,0,0,0,0,3,0,0,0,0,0,0,6,2,0,0,0,0,0,0,0,6,3,2,3,3,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52
-PRATANIA,0,0,0,0,0,0,2,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,3,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16
-PRESIDENTE ALVES,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,2,0,0,0,0,0,0,0,0,2,2,1,1,1,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,17
-PROMISSAO,0,1,1,1,3,1,13,0,1,0,1,0,4,4,10,0,0,2,0,1,1,4,1,1,2,1,1,1,1,1,1,2,1,1,1,1,20,2,0,4,3,0,0,17,2,1,2,13,0,19,51,21,12,13,0,0,0,0,5,39,27,36,55,44,7,15,0,0,0,0,0,2,0,0,1,0,0,0,0,0,20,1,1,0,527
-REGINOPOLIS,0,0,0,1,0,0,5,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,8,0,4,2,0,0,0,0,1,6,4,6,6,4,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65
-SABINO,0,0,0,0,0,0,4,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,5,3,3,6,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39
-SAO MANUEL,0,1,0,2,4,1,8,1,0,0,1,0,1,1,6,0,0,2,1,0,0,5,6,0,1,1,0,0,0,0,0,2,0,0,0,0,13,2,0,35,4,0,0,4,4,3,1,6,10,18,35,14,3,13,0,10,0,0,0,39,21,21,21,20,30,21,1,0,0,0,0,2,0,0,2,0,0,0,0,1,1,0,0,0,400
-SARUTAIA,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,0,0,0,0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8
-TAGUAI,0,0,0,1,1,0,2,0,0,0,0,0,2,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,4,2,0,0,4,2,1,0,3,0,3,7,5,2,2,0,0,0,0,1,6,3,3,5,5,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,92
-TAQUARITUBA,0,1,0,1,2,0,2,0,0,0,1,0,0,3,1,1,0,2,1,0,0,2,0,1,0,1,1,1,1,1,1,1,1,1,0,0,10,1,0,18,2,0,0,5,2,2,1,3,0,0,12,19,2,7,0,0,0,0,2,13,7,9,10,8,7,7,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,177
-TEJUPA,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5
-TORRE DE PEDRA,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,3,1,0,0,0,0,0,0,0,1,2,1,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16
-TORRINHA,0,0,0,0,1,1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,3,0,0,1,1,2,0,2,0,0,3,1,2,1,0,0,0,0,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26
-URU,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4`;
+        // ==================================================================
+        // 1. INICIALIZAÇÃO E MAPA (Estilo Visual Limpo)
+        // ==================================================================
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false 
+        }).setView([-22.8, -49.0], 9);
 
-        // ==================================================================
-        // 1. INICIALIZAÇÃO DO MAPA
-        // ==================================================================
-        const map = L.map('map').setView([-22.8, -49.0], 8);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CartoDB',
-            subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
-        // ==================================================================
-        // 2. VARIÁVEL DE MODO
-        // ==================================================================
-        let currentMode = 'municipio'; // 'municipio', 'regiao' ou 'drsvi'
+        let currentMode = 'municipio';
+        let geojsonLayer;
+        let selectedLayer = null;
 
-        // ==================================================================
-        // 3. PRÉ-PROCESSAMENTO DOS DADOS
-        // ==================================================================
-
+        // Estruturas de Dados
         const partosMap = new Map();
         const partosDetalhados = new Map();
         const prenatalMap = new Map();
@@ -898,904 +832,458 @@ URU,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,
         const regionDetailsMap = new Map();
         const ibgeToRegionMap = new Map();
         const dataMap = new Map();
-        const regionMunicipios = new Map();
-        const equipamentosMap = new Map();
-        const equipamentosRegionMap = new Map();
-
+        const nameToIbgeMap = new Map();
         let headersUnidades = [];
-        let headersEquipamentos = [];
-        let geojsonLayer;
 
+        // ==================================================================
+        // 2. PROCESSAMENTO DE DADOS (Lógica Robusta)
+        // ==================================================================
         function normalizeString(str) {
             if (!str || typeof str !== 'string') return '';
-            return str.trim()
-                .toUpperCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace("*", "");
+            return str.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace("*", "");
         }
 
-        function processPartosData() {
-            const lines = csvPartosRaw.trim().split('\n');
+        function processAllData() {
+            // Unidades
+            const lines = csvDataRaw.trim().split('\n');
+            headersUnidades = lines[0].split(',');
+            
+            // Regions
+            const regLines = csvRegionsRaw.trim().split('\n');
+            const regionNames = regLines[3].split(',');
+            regionNames.forEach(name => {
+                if(name.trim()) regionTotals.set(name.trim(), 0);
+            });
+            for(let i=4; i<regLines.length; i++){
+                const row = regLines[i].split(',');
+                if(row.length < regionNames.length) continue;
+                for(let col=0; col<regionNames.length; col++){
+                    const regName = regionNames[col].trim();
+                    const mun = normalizeString(row[col]);
+                    if(regName && mun) regionMap.set(mun, regName);
+                }
+            }
+
+            // Unidades Loop
             for (let i = 1; i < lines.length; i++) {
-                const parts = lines[i].split(',');
+                const row = lines[i].split(',');
+                if(row.length < headersUnidades.length) continue;
+                
+                const obj = {};
+                let total = 0;
+                headersUnidades.forEach((h, idx) => {
+                    obj[h.trim()] = row[idx].trim();
+                    if(h !== 'Cod municipio' && h !== 'Municipio' && h !== 'Total') {
+                        total += parseInt(row[idx]) || 0;
+                    }
+                });
+                obj.Total = total;
+                const ibge = obj['Cod municipio'];
+                const nome = normalizeString(obj['Municipio']);
+                
+                dataMap.set(ibge, obj);
+                nameToIbgeMap.set(nome, ibge);
+                
+                const reg = regionMap.get(nome) || 'Outros';
+                ibgeToRegionMap.set(ibge, reg);
+                regionTotals.set(reg, (regionTotals.get(reg)||0) + total);
+            }
+
+            // Partos
+            const linesPartos = csvPartosRaw.trim().split('\n');
+            for (let i = 1; i < linesPartos.length; i++) {
+                const parts = linesPartos[i].split(',');
                 if (parts.length >= 4) {
                     const total = parseInt(parts[0]);
                     const municipio = normalizeString(parts[1]);
                     const tipoParto = parts[2].trim();
                     const ano = parts[3].trim();
-
                     if (!isNaN(total) && municipio) {
                         partosMap.set(municipio, (partosMap.get(municipio) || 0) + total);
-                        if (!partosDetalhados.has(municipio)) {
-                            partosDetalhados.set(municipio, []);
-                        }
-                        partosDetalhados.get(municipio).push({
-                            tipo: tipoParto,
-                            ano: ano,
-                            total: total
-                        });
+                        if (!partosDetalhados.has(municipio)) partosDetalhados.set(municipio, []);
+                        partosDetalhados.get(municipio).push({ tipo: tipoParto, ano: ano, total: total });
                     }
                 }
             }
-        }
 
-        function processPrenatalData() {
-            const lines = csvPrenatalRaw.trim().split('\n');
-            for (let i = 1; i < lines.length; i++) {
-                const parts = lines[i].split(',');
+            // Prenatal
+            const linesPrenatal = csvPrenatalRaw.trim().split('\n');
+            for (let i = 1; i < linesPrenatal.length; i++) {
+                const parts = linesPrenatal[i].split(',');
                 if (parts.length >= 5) {
                     const total = parseInt(parts[0]);
                     const municipio = normalizeString(parts[1]);
                     const item = parts[2].trim();
                     const tipo = parts[3].trim();
                     const ano = parts[4].trim();
-
                     if (!isNaN(total) && municipio) {
                         prenatalMap.set(municipio, (prenatalMap.get(municipio) || 0) + total);
-                        if (!prenatalDetalhados.has(municipio)) {
-                            prenatalDetalhados.set(municipio, []);
-                        }
-                        prenatalDetalhados.get(municipio).push({
-                            item: item,
-                            tipo: tipo,
-                            ano: ano,
-                            total: total
-                        });
+                        if (!prenatalDetalhados.has(municipio)) prenatalDetalhados.set(municipio, []);
+                        prenatalDetalhados.get(municipio).push({ item: item, tipo: tipo, ano: ano, total: total });
                     }
                 }
             }
-        }
 
-        function processRegionsData() {
-            const lines = csvRegionsRaw.trim().split('\n');
-            const regionNames = lines[3].split(',');
-
-            regionNames.forEach(name => {
-                if (name.trim()) {
-                    regionTotals.set(name.trim(), 0);
-                    regionMunicipios.set(name.trim(), []);
-                }
+            // Datalist
+            const dataList = document.getElementById('city-list');
+            const sortedNames = Array.from(nameToIbgeMap.keys()).sort();
+            sortedNames.forEach(nome => {
+                const option = document.createElement('option');
+                option.value = nome;
+                dataList.appendChild(option);
             });
-
-            for (let i = 4; i < lines.length; i++) {
-                const row = lines[i].split(',');
-                if (row.length < regionNames.length) continue;
-
-                for (let col = 0; col < regionNames.length; col++) {
-                    const regionName = regionNames[col].trim();
-                    const municipio = normalizeString(row[col]);
-                    if (regionName && municipio) {
-                        regionMap.set(municipio, regionName);
-                        regionMunicipios.get(regionName).push(municipio);
-                    }
-                }
-            }
         }
 
-        function processUnidadesData() {
-            const lines = csvDataRaw.trim().split('\n');
-            headersUnidades = lines[0].split(',');
-
-            const excludeCols = ['Cod municipio', 'Municipio', 'Total'];
-
-            for (let i = 1; i < lines.length; i++) {
-                const rowValues = lines[i].split(',');
-                if (rowValues.length < headersUnidades.length) continue;
-
-                const rowData = {};
-                let calculatedTotal = 0;
-
-                headersUnidades.forEach((header, index) => {
-                    const cleanHeader = header.trim();
-                    const value = rowValues[index].trim();
-                    rowData[cleanHeader] = value;
-
-                    if (!excludeCols.includes(cleanHeader)) {
-                        calculatedTotal += parseInt(value) || 0;
-                    }
-                });
-
-                rowData['Total'] = calculatedTotal;
-
-                const ibge6 = rowData['Cod municipio'];
-                const normName = normalizeString(rowData['Municipio']);
-                const regionName = regionMap.get(normName) || 'Sem Regiao';
-
-                ibgeToRegionMap.set(ibge6, regionName);
-
-                const currentRegionTotal = regionTotals.get(regionName) || 0;
-                regionTotals.set(regionName, currentRegionTotal + calculatedTotal);
-
-                if (!regionDetailsMap.has(regionName)) {
-                    regionDetailsMap.set(regionName, {});
-                }
-                const regionDetails = regionDetailsMap.get(regionName);
-
-                headersUnidades.forEach((header, index) => {
-                    const cleanHeader = header.trim();
-                    if (!excludeCols.includes(cleanHeader)) {
-                        const value = parseInt(rowValues[index]) || 0;
-                        regionDetails[cleanHeader] = (regionDetails[cleanHeader] || 0) + value;
-                    }
-                });
-
-                dataMap.set(ibge6, rowData);
-            }
-        }
-
-        function processEquipamentosData() {
-            const lines = csvEquipamentosRaw.trim().split('\n');
-            headersEquipamentos = lines[0].split(',');
-
-            const excludeCols = ['Município', 'Total'];
-
-            for (let i = 1; i < lines.length; i++) {
-                const rowValues = lines[i].split(',');
-                if (rowValues.length < headersEquipamentos.length) continue;
-
-                const rowData = {};
-                let calculatedTotal = 0;
-
-                headersEquipamentos.forEach((header, index) => {
-                    const cleanHeader = header.trim();
-                    const value = rowValues[index].trim();
-                    rowData[cleanHeader] = value;
-
-                    if (!excludeCols.includes(cleanHeader)) {
-                        calculatedTotal += parseInt(value) || 0;
-                    }
-                });
-
-                rowData['Total'] = calculatedTotal;
-
-                const municipioNome = rowData['Município'];
-                const normName = normalizeString(municipioNome);
-
-                equipamentosMap.set(normName, rowData);
-
-                const regionName = regionMap.get(normName) || 'Sem Regiao';
-
-                if (!equipamentosRegionMap.has(regionName)) {
-                    equipamentosRegionMap.set(regionName, {});
-                }
-                const regionEquip = equipamentosRegionMap.get(regionName);
-
-                headersEquipamentos.forEach((header, index) => {
-                    const cleanHeader = header.trim();
-                    if (!excludeCols.includes(cleanHeader)) {
-                        const value = parseInt(rowValues[index]) || 0;
-                        regionEquip[cleanHeader] = (regionEquip[cleanHeader] || 0) + value;
-                    }
-                });
-            }
-        }
-
-        processPartosData();
-        processPrenatalData();
-        processRegionsData();
-        processUnidadesData();
-        processEquipamentosData();
+        processAllData();
 
         // ==================================================================
-        // 4. FUNÇÕES DE ESTILO E INTERAÇÃO
+        // 3. ESTILIZAÇÃO E TOOLTIPS
         // ==================================================================
-
-        function getColor(d) {
-            return d > 50 ? '#800026' :
-                   d > 30 ? '#BD0026' :
-                   d > 20 ? '#E31A1C' :
-                   d > 10 ? '#FC4E2A' :
-                   d > 5  ? '#FD8D3C' :
-                   d > 0  ? '#FEB24C' :
-                            '#FFEDA0';
-        }
-
         function getRegionColor(region) {
-            switch (region) {
-                case 'Polo Cuesta': return '#40E0D0';
-                case 'Vale do Jurumirim': return '#FFA500';
-                case 'Bauru': return '#FFD700';
-                case 'Jau': return '#FFB6C1';
-                case 'Lins': return '#87CEEB';
-                default: return '#999999';
-            }
+            const colors = {
+                'Polo Cuesta': '#00a8cc',
+                'Vale do Jurumirim': '#ff9f43',
+                'Bauru': '#feca57',
+                'Jaú': '#ff6b6b',
+                'Lins': '#54a0ff',
+                'Sem Regiao': '#c8d6e5'
+            };
+            return colors[region] || '#c8d6e5';
         }
 
         function style(feature) {
-            const ibge7 = feature.properties.id || feature.properties.CD_MUN;
-            const ibge6 = String(ibge7).substring(0, 6);
-
-            const data = dataMap.get(ibge6);
-            const regionName = ibgeToRegionMap.get(ibge6);
-
-            if (data) {
-                return {
-                    fillColor: getRegionColor(regionName),
-                    fillOpacity: 0.7,
-                    weight: 2.5,
-                    opacity: 1,
-                    color: getRegionColor(regionName),
-                    dashArray: ''
-                };
-            } else {
-                return {
-                    fillColor: '#cccccc',
-                    weight: 0.5,
-                    opacity: 0.5,
-                    color: '#999',
-                    fillOpacity: 0.2
-                };
-            }
-        }
-
-        // Box de informações da REGIÃO
-        const regionInfo = L.control({position: 'topright'});
-        regionInfo.onAdd = function (map) {
-            this._div = L.DomUtil.create('div', 'region-info');
-            this.update();
-            return this._div;
-        };
-        regionInfo.update = function (props) {
-            if (!props) {
-                this._div.innerHTML = '<p style="text-align:center; color:#999; font-size:14px;">Passe o mouse sobre um municipio</p>';
-                return;
-            }
-
-            let html = '<h4>' + props.name + '</h4>';
-
-            const details = regionDetailsMap.get(props.name) || {};
-            const detailsKeys = Object.keys(details).sort((a, b) => details[b] - details[a]);
-
-            if (detailsKeys.length > 0) {
-                detailsKeys.forEach(key => {
-                    const value = details[key];
-                    if (value > 0) {
-                        html += '<div class="detail-row">';
-                        html += '<span class="detail-label">' + key + '</span>';
-                        html += '<span class="detail-value">' + value + '</span>';
-                        html += '</div>';
-                    }
-                });
-            }
-
-            html += '<div class="total-highlight">';
-            html += '<div style="display:flex; justify-content:space-between;">';
-            html += '<strong>TOTAL GERAL:</strong>';
-            html += '<strong>' + props.total + '</strong>';
-            html += '</div></div>';
-
-            this._div.innerHTML = html;
-        };
-        regionInfo.addTo(map);
-
-        // Box de informações do MUNICÍPIO
-        const municipioInfo = L.control({position: 'topright'});
-        municipioInfo.onAdd = function (map) {
-            this._div = L.DomUtil.create('div', 'municipio-info');
-            this.update();
-            return this._div;
-        };
-        municipioInfo.update = function (props) {
-            if (!props) {
-                this._div.style.display = 'none';
-                return;
-            }
-
-            this._div.style.display = 'block';
-            let html = '<h4>' + props.name + '</h4>';
-
-            const details = props.details || {};
-            const detailsKeys = Object.keys(details).sort((a, b) => details[b] - details[a]);
-
-            if (detailsKeys.length > 0) {
-                detailsKeys.forEach(key => {
-                    const value = details[key];
-                    if (value > 0) {
-                        html += '<div class="detail-row">';
-                        html += '<span class="detail-label">' + key + '</span>';
-                        html += '<span class="detail-value">' + value + '</span>';
-                        html += '</div>';
-                    }
-                });
-            }
-
-            html += '<div class="total-highlight">';
-            html += '<div style="display:flex; justify-content:space-between;">';
-            html += '<strong>TOTAL:</strong>';
-            html += '<strong>' + props.total + '</strong>';
-            html += '</div></div>';
-
-            this._div.innerHTML = html;
-        };
-        municipioInfo.addTo(map);
-
-        let currentHighlightedRegion = null;
-        let originalTransforms = new Map();
-
-        function highlightFeature(e) {
-            const layer = e.target;
-            const ibge6 = String(layer.feature.properties.id).substring(0, 6);
-            if (dataMap.has(ibge6)) {
-                const regionName = ibgeToRegionMap.get(ibge6);
-                const municipioData = dataMap.get(ibge6);
-
-                // Modo DRS VI: destacar TODOS os municípios da DRS VI
-                if (currentMode === 'drsvi') {
-                    geojsonLayer.eachLayer(function(l) {
-                        const lIbge6 = String(l.feature.properties.id).substring(0, 6);
-                        if (dataMap.has(lIbge6)) {
-                            l.setStyle({
-                                weight: 3,
-                                color: 'black',
-                                dashArray: '',
-                                fillOpacity: 0.95
-                            });
-                            l.bringToFront();
-                        }
-                    });
-
-                    // Atualizar info box com dados consolidados da DRS VI
-                    let totalDRSVI = 0;
-                    dataMap.forEach((data) => {
-                        totalDRSVI += parseInt(data.Total) || 0;
-                    });
-                    regionInfo.update({ name: 'DRS VI Completa', total: totalDRSVI });
-                    municipioInfo.update();
-                    return;
-                }
-
-                // Modo Município: destacar APENAS o município atual
-                if (currentMode === 'municipio') {
-                    layer.setStyle({
-                        weight: 3,
-                        color: 'black',
-                        dashArray: '',
-                        fillOpacity: 0.95
-                    });
-                    layer.bringToFront();
-
-                    const regionTotal = regionTotals.get(regionName);
-                    regionInfo.update({ name: regionName, total: regionTotal });
-
-                    const excludeCols = ['Cod municipio', 'Municipio', 'Total'];
-                    const municipioDetails = {};
-                    headersUnidades.forEach(h => {
-                        const header = h.trim();
-                        if (!excludeCols.includes(header)) {
-                            const val = parseInt(municipioData[header]) || 0;
-                            if (val > 0) {
-                                municipioDetails[header] = val;
-                            }
-                        }
-                    });
-
-                    municipioInfo.update({
-                        name: municipioData.Municipio,
-                        details: municipioDetails,
-                        total: municipioData.Total
-                    });
-                    return;
-                }
-
-                // Modo Região: destacar todos os municípios da região
-                if (currentHighlightedRegion && currentHighlightedRegion !== regionName) {
-                    resetAllRegionHighlights();
-                }
-
-                currentHighlightedRegion = regionName;
-
-                geojsonLayer.eachLayer(function(l) {
-                    const lIbge6 = String(l.feature.properties.id).substring(0, 6);
-                    const lRegion = ibgeToRegionMap.get(lIbge6);
-
-                    if (lRegion === regionName && dataMap.has(lIbge6)) {
-                        if (!originalTransforms.has(lIbge6)) {
-                            const bounds = l.getBounds();
-                            originalTransforms.set(lIbge6, {
-                                center: bounds.getCenter(),
-                                layer: l
-                            });
-                        }
-
-                        l.setStyle({
-                            weight: 3,
-                            color: 'black',
-                            dashArray: '',
-                            fillOpacity: 0.95,
-                            transform: 'scale(1.05)',
-                            transformOrigin: 'center'
-                        });
-                        l.bringToFront();
-                    } else {
-                        if (dataMap.has(lIbge6)) {
-                            l.setStyle({
-                                fillOpacity: 0.3,
-                                opacity: 0.3
-                            });
-                        }
-                    }
-                });
-
-                const regionTotal = regionTotals.get(regionName);
-                regionInfo.update({ name: regionName, total: regionTotal });
-
-                const excludeCols = ['Cod municipio', 'Municipio', 'Total'];
-                const municipioDetails = {};
-                headersUnidades.forEach(h => {
-                    const header = h.trim();
-                    if (!excludeCols.includes(header)) {
-                        const val = parseInt(municipioData[header]) || 0;
-                        if (val > 0) {
-                            municipioDetails[header] = val;
-                        }
-                    }
-                });
-
-                municipioInfo.update({
-                    name: municipioData.Municipio,
-                    details: municipioDetails,
-                    total: municipioData.Total
-                });
-            }
-        }
-
-        function resetAllRegionHighlights() {
-            geojsonLayer.eachLayer(function(l) {
-                geojsonLayer.resetStyle(l);
-            });
-            originalTransforms.clear();
-        }
-
-        function resetHighlight(e) {
-            currentHighlightedRegion = null;
-            resetAllRegionHighlights();
-            regionInfo.update();
-            municipioInfo.update();
-        }
-
-        // ==================================================================
-        // 5. FUNÇÕES DE CLICK (TRÊS MODOS)
-        // ==================================================================
-
-        function showMunicipioReport(layer) {
-            const props = layer.feature.properties;
-            const ibge6 = String(props.id || props.CD_MUN).substring(0, 6);
-            const data = dataMap.get(ibge6);
-
-            if (!data) return;
-
-            const normName = normalizeString(data.Municipio);
-            const totalPartos = partosMap.get(normName) || 0;
-            const totalPrenatal = prenatalMap.get(normName) || 0;
-            const detalhesPartos = partosDetalhados.get(normName) || [];
-            const detalhesPrenatal = prenatalDetalhados.get(normName) || [];
-
-            let unitsHtml = '<div class="info-popup">';
-            headersUnidades.forEach(h => {
-                const header = h.trim();
-                if (header !== 'Cod municipio' && header !== 'Municipio' && header !== 'Total') {
-                    const val = parseInt(data[header]);
-                    if (val > 0) {
-                        unitsHtml += '<div class="info-row"><span class="info-label">' + header + ':</span><span class="info-value">' + val + '</span></div>';
-                    }
-                }
-            });
-            unitsHtml += '<div class="info-row total-row"><span class="info-label">TOTAL GERAL:</span><span class="info-value">' + data.Total + '</span></div></div>';
-
-            let partosHtml = '<div class="info-popup">';
-            if (detalhesPartos.length > 0) {
-                const partosPorTipo = {};
-                detalhesPartos.forEach(p => {
-                    if (!partosPorTipo[p.tipo]) {
-                        partosPorTipo[p.tipo] = [];
-                    }
-                    partosPorTipo[p.tipo].push(p);
-                });
-                const tiposOrdenados = Object.keys(partosPorTipo).sort((a, b) => {
-                    const totalA = partosPorTipo[a].reduce((sum, item) => sum + item.total, 0);
-                    const totalB = partosPorTipo[b].reduce((sum, item) => sum + item.total, 0);
-                    return totalB - totalA;
-                });
-                tiposOrdenados.forEach(tipo => {
-                    const itens = partosPorTipo[tipo].sort((a, b) => a.ano.localeCompare(b.ano));
-                    itens.forEach(p => {
-                        partosHtml += '<div class="info-row"><span class="info-label">' + p.tipo + ' (' + p.ano + '):</span><span class="info-value">' + p.total + '</span></div>';
-                    });
-                });
-            } else {
-                partosHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            partosHtml += '<div class="info-row total-row"><span class="info-label">TOTAL DE PARTOS:</span><span class="info-value">' + totalPartos + '</span></div></div>';
-
-            let prenatalHtml = '<div class="info-popup">';
-            if (detalhesPrenatal.length > 0) {
-                const prenatalPorTipo = {};
-                detalhesPrenatal.forEach(p => {
-                    if (!prenatalPorTipo[p.tipo]) {
-                        prenatalPorTipo[p.tipo] = [];
-                    }
-                    prenatalPorTipo[p.tipo].push(p);
-                });
-                const tiposOrdenados = Object.keys(prenatalPorTipo).sort((a, b) => {
-                    const totalA = prenatalPorTipo[a].reduce((sum, item) => sum + item.total, 0);
-                    const totalB = prenatalPorTipo[b].reduce((sum, item) => sum + item.total, 0);
-                    return totalB - totalA;
-                });
-                tiposOrdenados.forEach(tipo => {
-                    const itens = prenatalPorTipo[tipo].sort((a, b) => a.ano.localeCompare(b.ano));
-                    itens.forEach(p => {
-                        prenatalHtml += '<div class="info-row"><span class="info-label">' + p.tipo + ' (' + p.ano + '):</span><span class="info-value">' + p.total + '</span></div>';
-                    });
-                });
-            } else {
-                prenatalHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            prenatalHtml += '<div class="info-row total-row"><span class="info-label">TOTAL PRE-NATAL:</span><span class="info-value">' + totalPrenatal + '</span></div></div>';
-
-            // Gerar HTML dos Equipamentos
-            let equipamentosHtml = '<div class="info-popup">';
-            const equipData = equipamentosMap.get(normName);
-            if (equipData) {
-                const equipKeys = Object.keys(equipData).filter(k => k !== 'Município' && k !== 'Total' && parseInt(equipData[k]) > 0);
-                equipKeys.sort((a, b) => parseInt(equipData[b]) - parseInt(equipData[a]));
-                if (equipKeys.length > 0) {
-                    equipKeys.forEach(key => {
-                        const val = parseInt(equipData[key]);
-                        equipamentosHtml += '<div class="info-row"><span class="info-label">' + key + ':</span><span class="info-value">' + val + '</span></div>';
-                    });
-                } else {
-                    equipamentosHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-                }
-                equipamentosHtml += '<div class="info-row total-row"><span class="info-label">TOTAL DE EQUIPAMENTOS:</span><span class="info-value">' + equipData.Total + '</span></div>';
-            } else {
-                equipamentosHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            equipamentosHtml += '</div>';
-
-            const featureJson = JSON.stringify(layer.feature);
-            const bounds = layer.getBounds();
-
-            const newWindowHtml = '<!DOCTYPE html><html lang="pt-br"><head><title>Relatorio - ' + data.Municipio + '</title><meta charset="utf-8" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>@page { size: A4; margin: 15mm; } body { font-family: \'Segoe UI\', sans-serif; margin: 0; padding: 0; } .print-body { padding: 15px; font-size: 11px; } .print-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start; } #map-print { width: 350px; height: 350px; border: 1px solid #ccc; z-index: 1; flex-shrink: 0; } #data-print { flex: 1; min-width: 300px; } .print-body h1 { color: #0056b3; font-size: 20px; margin: 0 0 15px 0; page-break-after: avoid; } .print-body h2 { border-bottom: 2px solid #eee; padding-bottom: 4px; color: #333; margin: 15px 0 8px 0; font-size: 14px; page-break-after: avoid; } .print-button { padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 15px; } .info-popup { font-size: 11px; max-height: none; overflow: visible; } .info-row { display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding: 3px 0; line-height: 1.4; } .info-label { font-weight: 600; color: #555; margin-right: 10px; flex: 1; font-size: 11px; } .info-value { font-weight: bold; color: #333; text-align: right; font-size: 11px; } .total-row { background-color: #e9ecef; margin-top: 6px; padding: 6px 5px; border-radius: 4px; font-size: 12px; color: #dc3545; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-button { display: none; } h1 { page-break-after: avoid; page-break-inside: avoid; } h2 { page-break-after: avoid; page-break-inside: avoid; } .print-container { page-break-inside: avoid; } #map-print { border: 1px solid #999; } }</style></head><body class="print-body"><button class="print-button" onclick="window.print()">Imprimir Relatorio</button><h1>Relatorio: ' + data.Municipio + '</h1><div class="print-container"><div id="map-print"></div><div id="data-print"><h2>Unidades de Saude</h2>' + unitsHtml + '<h2>Equipamentos</h2>' + equipamentosHtml + '<h2>Partos (2024-2025)</h2>' + partosHtml + '<h2>Pre-Natal Diabetes (2024-2025)</h2>' + prenatalHtml + '</div></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><script>const map = L.map(\'map-print\'); L.tileLayer(\'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png\', { attribution: \'&copy; OpenStreetMap &copy; CartoDB\' }).addTo(map); const feature = ' + featureJson + '; const bounds = [[' + bounds.getSouth() + ', ' + bounds.getWest() + '], [' + bounds.getNorth() + ', ' + bounds.getEast() + ']]; L.geoJson(feature, { style: { fillColor: \'#0056b3\', weight: 2, color: \'black\', fillOpacity: 0.6 } }).addTo(map); map.fitBounds(bounds);<\/script></body></html>';
-
-            const newWindow = window.open("", "_blank");
-            newWindow.document.write(newWindowHtml);
-            newWindow.document.close();
-        }
-
-        function showRegiaoReport(regionName) {
-            // Coletar todos os municípios da região
-            const municipiosData = [];
-            let totalUnidadesRegion = 0;
-            let totalPartosRegion = 0;
-            let totalPrenatalRegion = 0;
-            const partosDetalhadosRegion = [];
-            const prenatalDetalhadosRegion = [];
-
-            dataMap.forEach((data, ibge6) => {
-                const normName = normalizeString(data.Municipio);
-                const municipioRegion = regionMap.get(normName);
-
-                if (municipioRegion === regionName) {
-                    const partos = partosMap.get(normName) || 0;
-                    const prenatal = prenatalMap.get(normName) || 0;
-                    const unidades = parseInt(data.Total) || 0;
-
-                    totalUnidadesRegion += unidades;
-                    totalPartosRegion += partos;
-                    totalPrenatalRegion += prenatal;
-
-                    municipiosData.push({
-                        nome: data.Municipio,
-                        unidades: unidades,
-                        partos: partos,
-                        prenatal: prenatal
-                    });
-
-                    const detPartos = partosDetalhados.get(normName) || [];
-                    const detPrenatal = prenatalDetalhados.get(normName) || [];
-                    partosDetalhadosRegion.push(...detPartos);
-                    prenatalDetalhadosRegion.push(...detPrenatal);
-                }
-            });
-
-            municipiosData.sort((a, b) => b.unidades - a.unidades);
-
-            // Gerar HTML das Unidades de Saúde da Região
-            const regionDetails = regionDetailsMap.get(regionName) || {};
-            let unitsHtml = '<div class="info-popup">';
-            const detailsKeys = Object.keys(regionDetails).sort((a, b) => regionDetails[b] - regionDetails[a]);
-            detailsKeys.forEach(key => {
-                const value = regionDetails[key];
-                if (value > 0) {
-                    unitsHtml += '<div class="info-row"><span class="info-label">' + key + ':</span><span class="info-value">' + value + '</span></div>';
-                }
-            });
-            unitsHtml += '<div class="info-row total-row"><span class="info-label">TOTAL GERAL:</span><span class="info-value">' + totalUnidadesRegion + '</span></div></div>';
-
-            // Gerar HTML da lista de municípios
-            let municipiosHtml = '<div style="margin-top:15px;"><h2>Municipios da Regiao (' + municipiosData.length + ')</h2>';
-            municipiosData.forEach(mun => {
-                municipiosHtml += '<div class="municipio-item">';
-                municipiosHtml += '<div class="municipio-item-nome">' + mun.nome + '</div>';
-                municipiosHtml += '<div class="municipio-item-stats">';
-                municipiosHtml += '<span>Unidades: <strong>' + mun.unidades + '</strong></span>';
-                municipiosHtml += '<span>Partos: <strong>' + mun.partos + '</strong></span>';
-                municipiosHtml += '<span>Pre-natal: <strong>' + mun.prenatal + '</strong></span>';
-                municipiosHtml += '</div></div>';
-            });
-            municipiosHtml += '</div>';
-
-            // Gerar HTML dos Partos Consolidados
-            let partosHtml = '<div class="info-popup">';
-            if (partosDetalhadosRegion.length > 0) {
-                const partosPorTipo = {};
-                partosDetalhadosRegion.forEach(p => {
-                    if (!partosPorTipo[p.tipo]) {
-                        partosPorTipo[p.tipo] = { 2024: 0, 2025: 0 };
-                    }
-                    partosPorTipo[p.tipo][p.ano] += p.total;
-                });
-                const tiposOrdenados = Object.keys(partosPorTipo).sort((a, b) => {
-                    const totalA = partosPorTipo[a][2024] + partosPorTipo[a][2025];
-                    const totalB = partosPorTipo[b][2024] + partosPorTipo[b][2025];
-                    return totalB - totalA;
-                });
-                tiposOrdenados.forEach(tipo => {
-                    if (partosPorTipo[tipo][2024] > 0) {
-                        partosHtml += '<div class="info-row"><span class="info-label">' + tipo + ' (2024):</span><span class="info-value">' + partosPorTipo[tipo][2024] + '</span></div>';
-                    }
-                    if (partosPorTipo[tipo][2025] > 0) {
-                        partosHtml += '<div class="info-row"><span class="info-label">' + tipo + ' (2025):</span><span class="info-value">' + partosPorTipo[tipo][2025] + '</span></div>';
-                    }
-                });
-            } else {
-                partosHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            partosHtml += '<div class="info-row total-row"><span class="info-label">TOTAL DE PARTOS:</span><span class="info-value">' + totalPartosRegion + '</span></div></div>';
-
-            // Gerar HTML do Pré-Natal Consolidado
-            let prenatalHtml = '<div class="info-popup">';
-            if (prenatalDetalhadosRegion.length > 0) {
-                const prenatalPorTipo = {};
-                prenatalDetalhadosRegion.forEach(p => {
-                    if (!prenatalPorTipo[p.tipo]) {
-                        prenatalPorTipo[p.tipo] = { 2024: 0, 2025: 0 };
-                    }
-                    prenatalPorTipo[p.tipo][p.ano] += p.total;
-                });
-                const tiposOrdenados = Object.keys(prenatalPorTipo).sort((a, b) => {
-                    const totalA = prenatalPorTipo[a][2024] + prenatalPorTipo[a][2025];
-                    const totalB = prenatalPorTipo[b][2024] + prenatalPorTipo[b][2025];
-                    return totalB - totalA;
-                });
-                tiposOrdenados.forEach(tipo => {
-                    if (prenatalPorTipo[tipo][2024] > 0) {
-                        prenatalHtml += '<div class="info-row"><span class="info-label">' + tipo + ' (2024):</span><span class="info-value">' + prenatalPorTipo[tipo][2024] + '</span></div>';
-                    }
-                    if (prenatalPorTipo[tipo][2025] > 0) {
-                        prenatalHtml += '<div class="info-row"><span class="info-label">' + tipo + ' (2025):</span><span class="info-value">' + prenatalPorTipo[tipo][2025] + '</span></div>';
-                    }
-                });
-            } else {
-                prenatalHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            prenatalHtml += '<div class="info-row total-row"><span class="info-label">TOTAL PRE-NATAL:</span><span class="info-value">' + totalPrenatalRegion + '</span></div></div>';
-
-            // Gerar HTML dos Equipamentos Consolidados da Região
-            let equipamentosHtml = '<div class="info-popup">';
-            const regionEquip = equipamentosRegionMap.get(regionName);
-            if (regionEquip) {
-                const equipKeys = Object.keys(regionEquip).sort((a, b) => regionEquip[b] - regionEquip[a]);
-                let totalEquipRegion = 0;
-                equipKeys.forEach(key => {
-                    const value = regionEquip[key];
-                    if (value > 0) {
-                        equipamentosHtml += '<div class="info-row"><span class="info-label">' + key + ':</span><span class="info-value">' + value + '</span></div>';
-                        totalEquipRegion += value;
-                    }
-                });
-                equipamentosHtml += '<div class="info-row total-row"><span class="info-label">TOTAL DE EQUIPAMENTOS:</span><span class="info-value">' + totalEquipRegion + '</span></div>';
-            } else {
-                equipamentosHtml += '<div class="info-row"><span class="info-label">Sem dados</span></div>';
-            }
-            equipamentosHtml += '</div>';
-
-            // Coletar features da região para o mapa
-            const regionFeatures = [];
-            geojsonLayer.eachLayer(function(layer) {
-                const ibge6 = String(layer.feature.properties.id).substring(0, 6);
-                const layerRegion = ibgeToRegionMap.get(ibge6);
-                if (layerRegion === regionName && dataMap.has(ibge6)) {
-                    regionFeatures.push(layer.feature);
-                }
-            });
-
-            const regionFeaturesJson = JSON.stringify({
-                type: "FeatureCollection",
-                features: regionFeatures
-            });
-
-            const newWindowHtml = '<!DOCTYPE html><html lang="pt-br"><head><title>Relatorio - Regiao ' + regionName + '</title><meta charset="utf-8" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>@page { size: A4; margin: 15mm; } body { font-family: \'Segoe UI\', sans-serif; margin: 0; padding: 0; } .print-body { padding: 15px; font-size: 11px; } .print-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start; } #map-print { width: 350px; height: 350px; border: 1px solid #ccc; z-index: 1; flex-shrink: 0; } #data-print { flex: 1; min-width: 300px; } .print-body h1 { color: #0056b3; font-size: 20px; margin: 0 0 15px 0; page-break-after: avoid; } .print-body h2 { border-bottom: 2px solid #eee; padding-bottom: 4px; color: #333; margin: 15px 0 8px 0; font-size: 14px; page-break-after: avoid; } .print-button { padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 15px; } .info-popup { font-size: 11px; max-height: none; overflow: visible; } .info-row { display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding: 3px 0; line-height: 1.4; } .info-label { font-weight: 600; color: #555; margin-right: 10px; flex: 1; font-size: 11px; } .info-value { font-weight: bold; color: #333; text-align: right; font-size: 11px; } .total-row { background-color: #e9ecef; margin-top: 6px; padding: 6px 5px; border-radius: 4px; font-size: 12px; color: #dc3545; } .municipio-item { background: #f8f9fa; padding: 10px; margin: 8px 0; border-radius: 4px; border-left: 4px solid #0056b3; } .municipio-item-nome { font-weight: bold; color: #333; font-size: 12px; margin-bottom: 5px; } .municipio-item-stats { font-size: 11px; color: #666; display: flex; gap: 15px; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-button { display: none; } h1 { page-break-after: avoid; page-break-inside: avoid; } h2 { page-break-after: avoid; page-break-inside: avoid; } .print-container { page-break-inside: avoid; } #map-print { border: 1px solid #999; } }</style></head><body class="print-body"><button class="print-button" onclick="window.print()">Imprimir Relatorio</button><h1>Relatorio: Regiao ' + regionName + '</h1><div class="print-container"><div id="map-print"></div><div id="data-print"><h2>Unidades de Saude</h2>' + unitsHtml + municipiosHtml + '<h2 style="margin-top:20px;">Equipamentos Consolidados</h2>' + equipamentosHtml + '<h2>Partos Consolidados (2024-2025)</h2>' + partosHtml + '<h2>Pre-Natal Diabetes Consolidado (2024-2025)</h2>' + prenatalHtml + '</div></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><script>const map = L.map(\'map-print\'); L.tileLayer(\'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png\', { attribution: \'&copy; OpenStreetMap &copy; CartoDB\' }).addTo(map); const geojson = ' + regionFeaturesJson + '; const layer = L.geoJson(geojson, { style: { fillColor: \'' + getRegionColor(regionName) + '\', weight: 2, color: \'black\', fillOpacity: 0.6 } }).addTo(map); map.fitBounds(layer.getBounds());<\/script></body></html>';
-
-            const newWindow = window.open("", "_blank");
-            newWindow.document.write(newWindowHtml);
-            newWindow.document.close();
-        }
-
-        function showDRSVIReport() {
-            // NOVA FUNÇÃO: Relatório de toda DRS VI
-            // Coletar dados de TODAS as regiões
-            const regioesData = [];
-            let totalUnidadesDRSVI = 0;
-            let totalPartosDRSVI = 0;
-            let totalPrenatalDRSVI = 0;
-
-            regionTotals.forEach((total, regionName) => {
-                if (regionName !== 'Sem Regiao') {
-                    let totalPartosRegion = 0;
-                    let totalPrenatalRegion = 0;
-                    let totalUnidadesRegion = 0;
-                    let qtdMunicipios = 0;
-
-                    dataMap.forEach((data, ibge6) => {
-                        const normName = normalizeString(data.Municipio);
-                        const municipioRegion = regionMap.get(normName);
-
-                        if (municipioRegion === regionName) {
-                            qtdMunicipios++;
-                            const partos = partosMap.get(normName) || 0;
-                            const prenatal = prenatalMap.get(normName) || 0;
-                            const unidades = parseInt(data.Total) || 0;
-
-                            totalUnidadesRegion += unidades;
-                            totalPartosRegion += partos;
-                            totalPrenatalRegion += prenatal;
-
-                            totalUnidadesDRSVI += unidades;
-                            totalPartosDRSVI += partos;
-                            totalPrenatalDRSVI += prenatal;
-                        }
-                    });
-
-                    regioesData.push({
-                        nome: regionName,
-                        unidades: totalUnidadesRegion,
-                        partos: totalPartosRegion,
-                        prenatal: totalPrenatalRegion,
-                        municipios: qtdMunicipios
-                    });
-                }
-            });
-
-            regioesData.sort((a, b) => b.unidades - a.unidades);
-
-            // Gerar HTML
-            let regioesHtml = '';
-            regioesData.forEach(reg => {
-                regioesHtml += '<div class="regiao-section">';
-                regioesHtml += '<h3>' + reg.nome + ' (' + reg.municipios + ' municipios)</h3>';
-                regioesHtml += '<div style="display:flex; gap:20px; flex-wrap:wrap;">';
-                regioesHtml += '<div><strong>Unidades:</strong> ' + reg.unidades + '</div>';
-                regioesHtml += '<div><strong>Partos:</strong> ' + reg.partos + '</div>';
-                regioesHtml += '<div><strong>Pre-Natal:</strong> ' + reg.prenatal + '</div>';
-                regioesHtml += '</div></div>';
-            });
-
-            // Coletar TODOS os municípios para o mapa
-            const allFeatures = [];
-            geojsonLayer.eachLayer(function(layer) {
-                const ibge6 = String(layer.feature.properties.id).substring(0, 6);
-                if (dataMap.has(ibge6)) {
-                    allFeatures.push(layer.feature);
-                }
-            });
-
-            const allFeaturesJson = JSON.stringify({
-                type: "FeatureCollection",
-                features: allFeatures
-            });
-
-            const newWindowHtml = '<!DOCTYPE html><html lang="pt-br"><head><title>Relatorio - DRS VI Completa</title><meta charset="utf-8" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><style>body { font-family: \'Segoe UI\', sans-serif; margin: 0; padding: 20px; } h1 { color: #0056b3; border-bottom: 3px solid #0056b3; padding-bottom: 10px; } h2 { color: #333; margin-top: 20px; border-bottom: 2px solid #eee; padding-bottom: 5px; } .print-container { display: flex; gap: 20px; align-items: flex-start; margin: 20px 0; } #map-print { width: 500px; height: 500px; border: 1px solid #ccc; flex-shrink: 0; } .totais { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; } .totais h3 { margin: 0 0 15px 0; color: #1976d2; } .totais-grid { display: flex; gap: 30px; flex-wrap: wrap; } .total-item { flex: 1; min-width: 150px; } .total-item-label { font-size: 12px; color: #666; } .total-item-value { font-size: 28px; font-weight: bold; color: #1976d2; } .regiao-section { margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #0056b3; } .regiao-section h3 { margin: 0 0 10px 0; color: #0056b3; font-size: 16px; } .print-button { padding: 12px 24px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; } .print-button:hover { background: #0056b3; } @media print { .print-button { display: none; } body { background: white; } }</style></head><body><button class="print-button" onclick="window.print()">Imprimir Relatorio DRS VI</button><h1>Relatorio Consolidado: DRS VI Completa</h1><div class="totais"><h3>Totais Gerais da DRS VI</h3><div class="totais-grid"><div class="total-item"><div class="total-item-label">Total de Unidades</div><div class="total-item-value">' + totalUnidadesDRSVI + '</div></div><div class="total-item"><div class="total-item-label">Total de Partos</div><div class="total-item-value">' + totalPartosDRSVI + '</div></div><div class="total-item"><div class="total-item-label">Total Pre-Natal</div><div class="total-item-value">' + totalPrenatalDRSVI + '</div></div></div></div><div class="print-container"><div id="map-print"></div><div style="flex:1;"><h2>Regioes da DRS VI</h2>' + regioesHtml + '</div></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><script>const map = L.map(\'map-print\'); L.tileLayer(\'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png\', { attribution: \'&copy; OpenStreetMap &copy; CartoDB\' }).addTo(map); const geojson = ' + allFeaturesJson + '; const getRegionColor = function(region) { switch (region) { case \'Polo Cuesta\': return \'#40E0D0\'; case \'Vale do Jurumirim\': return \'#FFA500\'; case \'Bauru\': return \'#FFD700\'; case \'Jau\': return \'#FFB6C1\'; case \'Lins\': return \'#87CEEB\'; default: return \'#999999\'; } }; const ibgeToRegion = new Map(' + JSON.stringify([...ibgeToRegionMap]) + '); const layer = L.geoJson(geojson, { style: function(feature) { const ibge6 = String(feature.properties.id).substring(0, 6); const region = ibgeToRegion.get(ibge6); return { fillColor: getRegionColor(region), weight: 2, color: \'black\', fillOpacity: 0.6 }; } }).addTo(map); map.fitBounds(layer.getBounds());<\/script></body></html>';
-
-            const newWindow = window.open("", "_blank");
-            newWindow.document.write(newWindowHtml);
-            newWindow.document.close();
-        }
-
-        function handleMapClick(e) {
-            const layer = e.target;
-            const ibge6 = String(layer.feature.properties.id).substring(0, 6);
-
-            if (!dataMap.has(ibge6)) return;
-
-            if (currentMode === 'municipio') {
-                showMunicipioReport(layer);
-            } else if (currentMode === 'regiao') {
-                const regionName = ibgeToRegionMap.get(ibge6);
-                showRegiaoReport(regionName);
-            } else if (currentMode === 'drsvi') {
-                showDRSVIReport();
-            }
+            const ibge = String(feature.properties.id || feature.properties.CD_MUN).substring(0, 6);
+            const region = ibgeToRegionMap.get(ibge);
+            const hasData = dataMap.has(ibge);
+
+            return {
+                fillColor: hasData ? getRegionColor(region) : '#eee',
+                weight: 1,
+                opacity: 1,
+                color: 'white',
+                dashArray: '',
+                fillOpacity: 0.75
+            };
         }
 
         function onEachFeature(feature, layer) {
-            const ibge6 = String(feature.properties.id).substring(0, 6);
-            if (dataMap.has(ibge6)) {
+            const ibge = String(feature.properties.id || feature.properties.CD_MUN).substring(0, 6);
+            const data = dataMap.get(ibge);
+            
+            if (data) {
+                layer.bindTooltip(`<strong>${data.Municipio}</strong>`, {
+                    permanent: false,
+                    direction: "top",
+                    className: "smart-tooltip",
+                    offset: [0, -10],
+                    opacity: 1
+                });
                 layer.on({
                     mouseover: highlightFeature,
                     mouseout: resetHighlight,
-                    click: handleMapClick
+                    click: (e) => selectFeature(e.target)
                 });
             }
         }
 
+        function highlightFeature(e) {
+            const layer = e.target;
+            const ibge = String(layer.feature.properties.id).substring(0, 6);
+            layer.setStyle({ weight: 3, color: '#2f3542', fillOpacity: 0.95 });
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+            if(currentMode === 'regiao') {
+                const region = ibgeToRegionMap.get(ibge);
+                highlightRegion(region);
+            }
+        }
+
+        function resetHighlight(e) {
+            if(currentMode !== 'regiao') geojsonLayer.resetStyle(e.target);
+            if(selectedLayer && selectedLayer === e.target) {
+                selectedLayer.setStyle({ weight: 3, color: '#2f3542' });
+            }
+        }
+
+        function selectFeature(layer) {
+            if(selectedLayer) geojsonLayer.resetStyle(selectedLayer);
+            selectedLayer = layer;
+            const ibge = String(layer.feature.properties.id).substring(0, 6);
+            const data = dataMap.get(ibge);
+            if(currentMode === 'municipio') updateSidebarMunicipios(data);
+            else if (currentMode === 'regiao') {
+                const region = ibgeToRegionMap.get(ibge);
+                updateSidebarRegion(region);
+            }
+            map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 0.8 });
+        }
+
+        function highlightRegion(regionName) {
+            geojsonLayer.eachLayer(layer => {
+                const lIbge = String(layer.feature.properties.id).substring(0, 6);
+                const lRegion = ibgeToRegionMap.get(lIbge);
+                if(lRegion === regionName) layer.setStyle({ fillOpacity: 1, color: '#555', weight: 1.5 });
+                else layer.setStyle({ fillOpacity: 0.3, color: 'white', weight: 1 });
+            });
+        }
+
         // ==================================================================
-        // 6. EVENT LISTENERS PARA O MENU
+        // 4. ATUALIZAÇÃO DO PAINEL LATERAL
         // ==================================================================
+        const sidebar = document.getElementById('info-sidebar');
+        const content = document.getElementById('info-content');
+
+        function updateSidebarMunicipios(data) {
+            sidebar.classList.add('active');
+            const region = ibgeToRegionMap.get(data['Cod municipio']);
+            
+            let html = `
+                <div class="info-header">
+                    <span>Região: ${region}</span>
+                    <h2>${data.Municipio}</h2>
+                </div>
+                <div class="data-card">
+                    <h4><i class="fas fa-hospital-alt"></i> Total de Unidades</h4>
+                    <span class="big-number">${data.Total}</span>
+                </div>
+                <div class="data-card">
+                    <h4><i class="fas fa-list-ul"></i> Detalhes da Rede</h4>
+            `;
+
+            const iconMap = { 'HOSPITAL GERAL': 'fa-procedures', 'CENTRO DE SAUDE/UNIDADE BASICA': 'fa-user-md', 'PRONTO SOCORRO': 'fa-ambulance' };
+
+            headersUnidades.forEach(h => {
+                const val = parseInt(data[h.trim()]);
+                if (val > 0 && h !== 'Total' && h !== 'Cod municipio' && h !== 'Municipio') {
+                    let iconClass = 'fa-circle';
+                    for(const key in iconMap) if(h.includes(key)) iconClass = iconMap[key];
+                    html += `
+                        <div class="stat-row">
+                            <span class="stat-label"><i class="fas ${iconClass}" style="font-size:10px; color:#ccc; margin-right:5px;"></i> ${h}</span>
+                            <span class="stat-value">${val}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            html += `</div>
+                <button class="btn-action" onclick="printReport('${data.Municipio}')">
+                    <i class="fas fa-print"></i> Imprimir Relatório
+                </button>
+            `;
+            content.innerHTML = html;
+        }
+
+        function updateSidebarRegion(regionName) {
+            sidebar.classList.add('active');
+            const total = regionTotals.get(regionName);
+            let html = `
+                <div class="info-header" style="border-color: ${getRegionColor(regionName)}">
+                    <span>Departamento Regional</span>
+                    <h2 style="color:${getRegionColor(regionName)}">${regionName}</h2>
+                </div>
+                <div class="data-card">
+                    <h4>População de Unidades</h4>
+                    <span class="big-number" style="color:${getRegionColor(regionName)}">${total}</span>
+                </div>
+                <div style="padding:10px; color:#666; font-size:13px;">
+                    <i class="fas fa-info-circle"></i> Dados consolidados de todos os municípios desta microrregião.
+                </div>
+            `;
+            content.innerHTML = html;
+        }
+
+        document.querySelector('.search-input').addEventListener('change', function(e) {
+            const val = normalizeString(this.value);
+            if(nameToIbgeMap.has(val)) {
+                const ibge = nameToIbgeMap.get(val);
+                geojsonLayer.eachLayer(layer => {
+                    if(String(layer.feature.properties.id).substring(0, 6) === ibge) selectFeature(layer);
+                });
+            }
+        });
 
         document.querySelectorAll('input[name="modo"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                currentMode = this.value;
-                console.log('Modo alterado para:', currentMode);
+            radio.addEventListener('change', (e) => {
+                currentMode = e.target.value;
+                geojsonLayer.resetStyle();
+                sidebar.classList.remove('active');
+                if(currentMode === 'drsvi') {
+                    geojsonLayer.setStyle({ fillOpacity: 0.9, color: '#333' });
+                    content.innerHTML = '<div class="info-header"><h2>DRS VI Completa</h2></div><div class="data-card"><h4>Visão Geral</h4><p>Visualizando todos os dados consolidados.</p></div>';
+                    sidebar.classList.add('active');
+                }
             });
         });
 
         // ==================================================================
-        // 7. CARREGAMENTO DO GEOJSON ONLINE
+        // 5. FUNÇÃO DE IMPRESSÃO (Mapa + Totais)
         // ==================================================================
+        window.printReport = function(munName) {
+            const normName = normalizeString(munName);
+            const ibge = nameToIbgeMap.get(normName);
+            const data = dataMap.get(ibge);
+
+            if (!data) { alert("Dados não encontrados."); return; }
+
+            // Buscar Feature GeoJSON para o mapa
+            let munFeature = null;
+            geojsonLayer.eachLayer(layer => {
+                if (String(layer.feature.properties.id).substring(0, 6) === ibge) {
+                    munFeature = layer.feature;
+                }
+            });
+
+            const detalhesPartos = partosDetalhados.get(normName) || [];
+            const detalhesPrenatal = prenatalDetalhados.get(normName) || [];
+
+            // Calcular totais
+            let totalPartos = 0;
+            detalhesPartos.forEach(p => totalPartos += p.total);
+            
+            let totalPrenatal = 0;
+            detalhesPrenatal.forEach(p => totalPrenatal += p.total);
+
+            // Geração HTML Unidades
+            let unitsHtml = '<div class="section">';
+            headersUnidades.forEach(h => {
+                const val = parseInt(data[h.trim()]);
+                if (val > 0 && h !== 'Total' && h !== 'Cod municipio' && h !== 'Municipio') {
+                    unitsHtml += `<div class="row"><span>${h}</span><strong>${val}</strong></div>`;
+                }
+            });
+            unitsHtml += `</div>`;
+
+            // Geração HTML Partos
+            let partosHtml = '<div class="section"><h3>Partos (2024-2025)</h3>';
+            if (detalhesPartos.length > 0) {
+                detalhesPartos.forEach(p => {
+                    partosHtml += `<div class="row"><span>${p.tipo} (${p.ano})</span><strong>${p.total}</strong></div>`;
+                });
+            } else {
+                partosHtml += '<p>Sem dados registrados.</p>';
+            }
+            partosHtml += '</div>';
+
+            // Geração HTML Pré-natal
+            let prenatalHtml = '<div class="section"><h3>Pré-Natal Diabetes (2024-2025)</h3>';
+            if (detalhesPrenatal.length > 0) {
+                detalhesPrenatal.forEach(p => {
+                    prenatalHtml += `<div class="row"><span>${p.tipo} (${p.ano})</span><strong>${p.total}</strong></div>`;
+                });
+            } else {
+                prenatalHtml += '<p>Sem dados registrados.</p>';
+            }
+            prenatalHtml += '</div>';
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Relatório - ${munName}</title>
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                    <style>
+                        body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; max-width: 900px; margin: 0 auto; }
+                        h1 { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-top: 0; }
+                        h3 { color: #555; margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                        
+                        /* Layout de Topo: Mapa + Totais */
+                        .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                        
+                        #print-map { height: 300px; border: 1px solid #ccc; border-radius: 8px; }
+                        
+                        .dashboard { display: flex; flex-direction: column; gap: 15px; justify-content: center; }
+                        .dash-card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 5px solid #0056b3; }
+                        .dash-card h4 { margin: 0 0 5px 0; color: #666; font-size: 14px; text-transform: uppercase; }
+                        .dash-card .value { font-size: 28px; font-weight: bold; color: #0056b3; }
+
+                        .section { margin-bottom: 20px; }
+                        .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dotted #eee; font-size: 13px; }
+                        .row strong { color: #0056b3; }
+                        
+                        @media print { 
+                            .print-btn { display: none; } 
+                            body { padding: 0; max-width: none; }
+                            .header-grid { page-break-inside: avoid; }
+                        }
+                        .print-btn { background: #0056b3; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 16px; margin-bottom: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <button class="print-btn" onclick="window.print()">Imprimir Agora</button>
+                    <h1>Relatório Executivo: ${munName}</h1>
+                    
+                    <div class="header-grid">
+                        <div id="print-map"></div>
+                        <div class="dashboard">
+                            <h3>Resumo Executivo</h3>
+                            <div class="dash-card">
+                                <h4>Total de Unidades de Saúde</h4>
+                                <div class="value">${data.Total}</div>
+                            </div>
+                            <div class="dash-card" style="border-left-color: #00a8cc">
+                                <h4>Total de Partos (2024-25)</h4>
+                                <div class="value" style="color: #00a8cc">${totalPartos}</div>
+                            </div>
+                            <div class="dash-card" style="border-left-color: #ff4757">
+                                <h4>Atendimentos Pré-Natal</h4>
+                                <div class="value" style="color: #ff4757">${totalPrenatal}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Estrutura Detalhada de Unidades</h3>
+                    ${unitsHtml}
+                    ${partosHtml}
+                    ${prenatalHtml}
+                    
+                    <div style="margin-top: 50px; font-size: 12px; color: #999; text-align: center;">
+                        Documento gerado automaticamente pelo Sistema Inteligente SUS DRS VI
+                    </div>
+
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+                    <script>
+                        // Inicializar Mapa de Impressão
+                        const map = L.map('print-map', { zoomControl: false, attributionControl: false });
+                        L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
+                            maxZoom: 19
+                        }).addTo(map);
+
+                        const feature = ${JSON.stringify(munFeature)};
+                        if (feature) {
+                            const layer = L.geoJson(feature, {
+                                style: { fillColor: '#0056b3', weight: 2, color: 'black', fillOpacity: 0.4 }
+                            }).addTo(map);
+                            map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        };
+
         const GEOJSON_URL = 'https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-35-mun.json';
 
         fetch(GEOJSON_URL)
-            .then(response => {
-                if (!response.ok) throw new Error("Erro de rede ao baixar o mapa.");
-                return response.json();
-            })
+            .then(r => r.json())
             .then(data => {
                 document.getElementById('loading').style.display = 'none';
-
                 geojsonLayer = L.geoJson(data, {
                     style: style,
-                    onEachFeature: onEachFeature
-                }).addTo(map);
-
-                const group = new L.featureGroup();
-                geojsonLayer.eachLayer(function(layer){
-                    const ibge6 = String(layer.feature.properties.id).substring(0, 6);
-                    if(dataMap.has(ibge6)){
-                        group.addLayer(layer);
+                    onEachFeature: onEachFeature,
+                    filter: function(feature) {
+                        const ibge = String(feature.properties.id).substring(0, 6);
+                        return dataMap.has(ibge);
                     }
-                });
-                if(group.getLayers().length > 0) {
-                    map.fitBounds(group.getBounds());
-                }
+                }).addTo(map);
+                map.fitBounds(geojsonLayer.getBounds());
             })
-            .catch(error => {
-                document.getElementById('loading').innerHTML =
-                    '<span style="color:red">Falha ao carregar o mapa!<br/>Verifique sua conexao com a internet.</span>';
-                console.error('Erro GeoJSON:', error);
+            .catch(e => {
+                document.getElementById('loading').innerHTML = 'Erro ao carregar mapa.';
+                console.error(e);
             });
-
     </script>
 </body>
 </html>
